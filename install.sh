@@ -34,6 +34,15 @@ if ! codex mcp get advisor >/dev/null 2>&1; then
   echo "registered MCP server 'advisor'"
 fi
 
+# 承認プロンプトなしで advisor ツールを呼べるようにする(これが無いと
+# codex exec や自動相談でツール呼び出しがキャンセルされる)
+if ! grep -A5 '^\[mcp_servers\.advisor\]' "$CODEX_HOME/config.toml" 2>/dev/null \
+    | grep -q 'default_tools_approval_mode'; then
+  sed -i '/^\[mcp_servers\.advisor\]$/a default_tools_approval_mode = "approve"' \
+    "$CODEX_HOME/config.toml"
+  echo "set default_tools_approval_mode=approve for 'advisor'"
+fi
+
 if ! grep -qF "$MARKER_START" "$CODEX_HOME/AGENTS.md" 2>/dev/null; then
   cat >> "$CODEX_HOME/AGENTS.md" <<EOF
 
