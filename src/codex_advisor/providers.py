@@ -121,7 +121,7 @@ def call_advisor(
             time.sleep(RETRY_WAIT_SECONDS)
             continue
         if response.status_code != 200:
-            body = _redact(response.text[:500], api_key)
+            body = _redact(response.text, api_key)[:500]
             raise AdvisorError(f"HTTP {response.status_code} from {provider.kind}: {body}")
         try:
             return _PARSERS[provider.kind](response.json())

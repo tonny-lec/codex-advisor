@@ -104,3 +104,29 @@ def test_non_retryable_error_raises_with_redacted_body() -> None:
         call_advisor(OPENAI, "gpt-5.2", "sys", "user")
     assert "sk-openai-secret" not in str(exc.value)
     assert "400" in str(exc.value)
+
+
+@respx.mock
+def test_redaction_happens_before_truncation() -> None:
+    # キーが500文字境界をまたいでも断片が漏れない
+    text = "x" * 492 + "sk-openai-secret" + "y" * 100
+    respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=httpx.Response(400, text=text)
+    )
+    with pytest.raises(AdvisorError) as exc:
+        call_advisor(OPENAI, "gpt-5.2", "sys", "user")
+    assert "sk-o" not in str(exc.value)
+
+
+@respx.mock
+def test_transport_error_is_retried_and_redacted() -> None:
+    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
+        side_effect=[
+            httpx.ConnectError("connect failed (auth sk-openai-secret)"),
+            httpx.ConnectError("connect failed (auth sk-openai-secret)"),
+        ]
+    )
+    with pytest.raises(AdvisorError) as exc:
+        call_advisor(OPENAI, "gpt-5.2", "sys", "user")
+    assert route.call_count == 2
+    assert "sk-openai-secret" not in str(exc.value)
