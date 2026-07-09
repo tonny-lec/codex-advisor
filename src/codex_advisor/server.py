@@ -91,6 +91,38 @@ def consult_advisor(question: str, context_hint: str = "") -> str:
     return prefix + f"[advice from {cfg.model}]\n{advice}{transcript_note}"
 
 
+@mcp.tool()
+def advisor_config(action: str, model: str = "") -> str:
+    """Get or change advisor settings. Use when the user asks.
+
+    action='get' shows current settings. action='set' changes the advisor
+    model; pass model as '<provider>/<model>', e.g. 'openai/gpt-5.2',
+    'anthropic/claude-opus-4-8', 'gemini/gemini-2.5-pro'. Any model name is
+    accepted (no allowlist). action='off' disables consultations.
+    """
+    cfg = cfg_mod.load_config()
+    if action == "get":
+        state = "enabled" if cfg.enabled else "disabled"
+        return (
+            f"advisor is {state}; model = {cfg.model}; "
+            f"max_context_chars = {cfg.max_context_chars}; "
+            f"max_consults_per_session = {cfg.max_consults_per_session}"
+        )
+    if action == "set":
+        if not model:
+            return "error: action='set' requires model in '<provider>/<model>' form"
+        try:
+            cfg_mod.split_model(model)
+        except ValueError as e:
+            return f"error: {e}"
+        cfg_mod.set_config_values(model=model, enabled=True)
+        return f"advisor model set to {model} (enabled)"
+    if action == "off":
+        cfg_mod.set_config_values(enabled=False)
+        return "advisor disabled"
+    return "error: action must be 'get', 'set', or 'off'"
+
+
 def main() -> None:
     cfg_mod.load_env_file()
     mcp.run()
