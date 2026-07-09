@@ -94,7 +94,7 @@ def load_config() -> AdvisorConfig:
     if path.exists():
         try:
             raw = tomllib.loads(path.read_text(encoding="utf-8"))
-        except (tomllib.TOMLDecodeError, OSError) as e:
+        except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError) as e:
             warnings.append(f"advisor.toml is broken; using defaults ({e})")
             raw = {}
     return AdvisorConfig(
@@ -118,7 +118,7 @@ def set_config_values(**updates: object) -> None:
     if path.exists():
         try:
             raw = tomllib.loads(path.read_text(encoding="utf-8"))
-        except (tomllib.TOMLDecodeError, OSError):
+        except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError):
             raw = {}
     raw.update(updates)
     path.parent.mkdir(parents=True, exist_ok=True)

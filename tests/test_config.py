@@ -44,6 +44,14 @@ def test_broken_toml_falls_back_to_defaults(isolated_paths: Path) -> None:
     assert cfg.warnings
 
 
+def test_non_utf8_file_falls_back_to_defaults(isolated_paths: Path) -> None:
+    (isolated_paths / "advisor.toml").write_bytes(b"\xff\xfe\x00broken")
+    cfg = config.load_config()
+    assert cfg.enabled is True
+    assert cfg.model == "anthropic/claude-opus-4-8"
+    assert cfg.warnings
+
+
 def test_non_integer_value_falls_back(isolated_paths: Path) -> None:
     (isolated_paths / "advisor.toml").write_text('max_context_chars = "abc"', encoding="utf-8")
     cfg = config.load_config()
