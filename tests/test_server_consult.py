@@ -95,3 +95,25 @@ def test_warning_prefix_on_broken_config(
     (isolated_paths / "advisor.toml").write_text("enabled = [broken", encoding="utf-8")
     _write_rollout(isolated_paths)
     assert server.consult_advisor("q").startswith("[advisor warning]")
+
+
+def test_consult_survives_unreadable_rollout_file(
+    isolated_paths: Path, fake_advisor: dict[str, Any]
+) -> None:
+    d = isolated_paths / "sessions" / "2026" / "07" / "10"
+    d.mkdir(parents=True)
+    (d / "rollout-x.jsonl").write_bytes(b"\xff\xfe broken")
+    result = server.consult_advisor("q")
+    assert "do X first" in result  # 相談自体は成立する(question のみ)
+    assert "no session transcript" in result
+
+
+def test_consult_reports_prompt_load_failure(
+    isolated_paths: Path, fake_advisor: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def boom() -> str:
+        raise FileNotFoundError("advisor_prompt.md missing")
+
+    monkeypatch.setattr(server, "_system_prompt", boom)
+    result = server.consult_advisor("q")
+    assert "advisor unavailable" in result

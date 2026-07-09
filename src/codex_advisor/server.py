@@ -62,21 +62,28 @@ def consult_advisor(question: str, context_hint: str = "") -> str:
             f"advisor unavailable: unknown provider {provider_name!r}. "
             f"Add [providers.{provider_name}] to advisor.toml."
         )
+    try:
+        system_prompt = _system_prompt()
+    except Exception as e:
+        return prefix + f"advisor unavailable: failed to load advisor_prompt.md ({e})"
     transcript = ""
     transcript_note = ""
     rollout_path = rollout.find_latest_rollout(cfg_mod.sessions_root())
+    if rollout_path is not None:
+        try:
+            transcript = rollout.build_transcript(rollout_path, cfg.max_context_chars)
+        except Exception:
+            rollout_path = None
     if rollout_path is None:
         transcript_note = (
             "\n\n(note: no session transcript was found; advice is based on the question only)"
         )
-    else:
-        transcript = rollout.build_transcript(rollout_path, cfg.max_context_chars)
     _consult_count += 1
     try:
         advice = providers.call_advisor(
             provider,
             model_name,
-            _system_prompt(),
+            system_prompt,
             _build_user_content(transcript, question, context_hint),
         )
     except providers.AdvisorError as e:
