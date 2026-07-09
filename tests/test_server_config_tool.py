@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from codex_advisor import config, server
 
 
@@ -40,3 +42,26 @@ def test_off_disables(isolated_paths: Path) -> None:
 
 def test_unknown_action(isolated_paths: Path) -> None:
     assert "error" in server.advisor_config("dance")
+
+
+def test_set_reports_write_failure(
+    isolated_paths: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def boom(**updates: object) -> None:
+        raise PermissionError("read-only filesystem")
+
+    monkeypatch.setattr(server.cfg_mod, "set_config_values", boom)
+    out = server.advisor_config("set", model="openai/gpt-5.2")
+    assert "error" in out
+    assert "read-only filesystem" in out
+
+
+def test_off_reports_write_failure(
+    isolated_paths: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def boom(**updates: object) -> None:
+        raise PermissionError("read-only filesystem")
+
+    monkeypatch.setattr(server.cfg_mod, "set_config_values", boom)
+    out = server.advisor_config("off")
+    assert "error" in out

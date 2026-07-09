@@ -115,10 +115,16 @@ def advisor_config(action: str, model: str = "") -> str:
             cfg_mod.split_model(model)
         except ValueError as e:
             return f"error: {e}"
-        cfg_mod.set_config_values(model=model, enabled=True)
+        try:
+            cfg_mod.set_config_values(model=model, enabled=True)
+        except Exception as e:
+            return f"error: failed to write advisor.toml ({e})"
         return f"advisor model set to {model} (enabled)"
     if action == "off":
-        cfg_mod.set_config_values(enabled=False)
+        try:
+            cfg_mod.set_config_values(enabled=False)
+        except Exception as e:
+            return f"error: failed to write advisor.toml ({e})"
         return "advisor disabled"
     return "error: action must be 'get', 'set', or 'off'"
 
