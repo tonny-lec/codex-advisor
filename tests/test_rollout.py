@@ -42,8 +42,17 @@ def test_build_transcript_contents() -> None:
     assert "token_count" not in text  # event_msg
 
 
-def test_build_transcript_truncates_keeping_tail() -> None:
-    text = rollout.build_transcript(FIXTURE, max_chars=50)
+def test_build_transcript_truncates_at_block_boundary() -> None:
+    text = rollout.build_transcript(FIXTURE, max_chars=60)
     assert text.startswith("(古い履歴は省略)")
-    assert "README.md を作成しました" in text  # 新しい側が残る
-    assert "README を作って" not in text  # 古い側が落ちる
+    body = text.removeprefix("(古い履歴は省略)\n")
+    assert body.startswith("[")  # ブロック先頭から始まる(途中で切れない)
+    assert "[assistant]\nREADME.md を作成しました" in body
+    assert "README を作って" not in text
+
+
+def test_build_transcript_single_oversized_block_falls_back() -> None:
+    # 最新ブロック単体が上限超過でも全損させず末尾を残す
+    text = rollout.build_transcript(FIXTURE, max_chars=5)
+    assert text.startswith("(古い履歴は省略)\n")
+    assert len(text) <= len("(古い履歴は省略)\n") + 5

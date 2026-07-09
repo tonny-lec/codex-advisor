@@ -56,6 +56,12 @@ def build_transcript(path: Path, max_chars: int) -> str:
                 blocks.append(f"[tool result]\n{payload.get('output', '')}")
             # reasoning(暗号化済み)ほかは無視
     transcript = "\n\n".join(blocks)
-    if len(transcript) > max_chars:
-        transcript = TRUNCATION_MARKER + "\n" + transcript[-max_chars:]
-    return transcript
+    if len(transcript) <= max_chars:
+        return transcript
+    # 古いブロックから丸ごと落とし、新しい側をブロック境界で残す
+    while len(blocks) > 1 and len("\n\n".join(blocks)) > max_chars:
+        blocks.pop(0)
+    tail = "\n\n".join(blocks)
+    if len(tail) > max_chars:
+        tail = tail[-max_chars:]
+    return TRUNCATION_MARKER + "\n" + tail
