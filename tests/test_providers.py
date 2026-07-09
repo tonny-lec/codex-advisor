@@ -118,6 +118,13 @@ def test_redaction_happens_before_truncation() -> None:
     assert "sk-o" not in str(exc.value)
 
 
+def test_invalid_base_url_raises_advisor_error() -> None:
+    bad = ProviderConfig(kind="openai", base_url="https://x:abc", api_key_env="TEST_OPENAI_KEY")
+    with pytest.raises(AdvisorError) as exc:
+        call_advisor(bad, "gpt-5.2", "sys", "user")
+    assert "sk-openai-secret" not in str(exc.value)
+
+
 @respx.mock
 def test_transport_error_is_retried_and_redacted() -> None:
     route = respx.post("https://api.openai.com/v1/chat/completions").mock(

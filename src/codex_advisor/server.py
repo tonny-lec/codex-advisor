@@ -68,12 +68,13 @@ def consult_advisor(question: str, context_hint: str = "") -> str:
         return prefix + f"advisor unavailable: failed to load advisor_prompt.md ({e})"
     transcript = ""
     transcript_note = ""
-    rollout_path = rollout.find_latest_rollout(cfg_mod.sessions_root())
-    if rollout_path is not None:
-        try:
+    rollout_path = None
+    try:
+        rollout_path = rollout.find_latest_rollout(cfg_mod.sessions_root())
+        if rollout_path is not None:
             transcript = rollout.build_transcript(rollout_path, cfg.max_context_chars)
-        except Exception:
-            rollout_path = None
+    except Exception:
+        rollout_path = None
     if rollout_path is None:
         transcript_note = (
             "\n\n(note: no session transcript was found; advice is based on the question only)"
@@ -88,6 +89,8 @@ def consult_advisor(question: str, context_hint: str = "") -> str:
         )
     except providers.AdvisorError as e:
         return prefix + f"advisor unavailable: {e}. Proceed with your own judgment."
+    except Exception as e:
+        return prefix + f"advisor unavailable: unexpected error ({e}). Proceed with your own judgment."
     return prefix + f"[advice from {cfg.model}]\n{advice}{transcript_note}"
 
 
@@ -101,32 +104,33 @@ def advisor_config(action: str, model: str = "") -> str:
     accepted (no allowlist). action='off' disables consultations.
     """
     cfg = cfg_mod.load_config()
+    prefix = "".join(f"[advisor warning] {w}\n" for w in cfg.warnings)
     if action == "get":
         state = "enabled" if cfg.enabled else "disabled"
-        return (
+        return prefix + (
             f"advisor is {state}; model = {cfg.model}; "
             f"max_context_chars = {cfg.max_context_chars}; "
             f"max_consults_per_session = {cfg.max_consults_per_session}"
         )
     if action == "set":
         if not model:
-            return "error: action='set' requires model in '<provider>/<model>' form"
+            return prefix + "error: action='set' requires model in '<provider>/<model>' form"
         try:
             cfg_mod.split_model(model)
         except ValueError as e:
-            return f"error: {e}"
+            return prefix + f"error: {e}"
         try:
             cfg_mod.set_config_values(model=model, enabled=True)
         except Exception as e:
-            return f"error: failed to write advisor.toml ({e})"
-        return f"advisor model set to {model} (enabled)"
+            return prefix + f"error: failed to write advisor.toml ({e})"
+        return prefix + f"advisor model set to {model} (enabled)"
     if action == "off":
         try:
             cfg_mod.set_config_values(enabled=False)
         except Exception as e:
-            return f"error: failed to write advisor.toml ({e})"
-        return "advisor disabled"
-    return "error: action must be 'get', 'set', or 'off'"
+            return prefix + f"error: failed to write advisor.toml ({e})"
+        return prefix + "advisor disabled"
+    return prefix + "error: action must be 'get', 'set', or 'off'"
 
 
 def main() -> None:

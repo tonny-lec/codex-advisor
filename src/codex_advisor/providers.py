@@ -107,7 +107,10 @@ def call_advisor(
         raise AdvisorError(
             f"unknown provider kind {provider.kind!r} (expected openai/anthropic/gemini)"
         )
-    request = _BUILDERS[provider.kind](provider, model, api_key, system_prompt, user_content)
+    try:
+        request = _BUILDERS[provider.kind](provider, model, api_key, system_prompt, user_content)
+    except Exception as e:
+        raise AdvisorError(f"invalid provider request: {_redact(str(e), api_key)}") from e
     last_error = ""
     for attempt in range(2):
         try:

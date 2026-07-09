@@ -108,6 +108,29 @@ def test_consult_survives_unreadable_rollout_file(
     assert "no session transcript" in result
 
 
+def test_consult_survives_unexpected_provider_error(
+    isolated_paths: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def boom(*a: Any, **kw: Any) -> str:
+        raise RuntimeError("totally unexpected")
+
+    monkeypatch.setattr(server.providers, "call_advisor", boom)
+    result = server.consult_advisor("q")
+    assert "advisor unavailable" in result
+
+
+def test_consult_survives_find_latest_rollout_error(
+    isolated_paths: Path, fake_advisor: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def boom(root: Path) -> Path | None:
+        raise OSError("stat race")
+
+    monkeypatch.setattr(server.rollout, "find_latest_rollout", boom)
+    result = server.consult_advisor("q")
+    assert "do X first" in result
+    assert "no session transcript" in result
+
+
 def test_consult_reports_prompt_load_failure(
     isolated_paths: Path, fake_advisor: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:

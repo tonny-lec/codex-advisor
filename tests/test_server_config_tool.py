@@ -11,6 +11,12 @@ def test_get_reports_current_settings(isolated_paths: Path) -> None:
     assert "enabled" in out
 
 
+def test_get_shows_warnings_on_broken_config(isolated_paths: Path) -> None:
+    (isolated_paths / "advisor.toml").write_text("enabled = [broken", encoding="utf-8")
+    out = server.advisor_config("get")
+    assert out.startswith("[advisor warning]")
+
+
 def test_set_changes_model_and_reenables(isolated_paths: Path) -> None:
     (isolated_paths / "advisor.toml").write_text("enabled = false", encoding="utf-8")
     out = server.advisor_config("set", model="gemini/gemini-2.5-pro")
