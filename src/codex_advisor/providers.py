@@ -55,9 +55,10 @@ def _anthropic_request(
         "messages": [{"role": "user", "content": user}],
     }
     if reasoning:
-        budget = REASONING_BUDGET_TOKENS[reasoning]
-        body["thinking"] = {"type": "enabled", "budget_tokens": budget}
-        body["max_tokens"] = budget + 8192
+        # enabled+budget_tokens は claude-fable-5 / Opus 4.7+ で 400。
+        # adaptive + output_config.effort は 4.6 以降の全系統で有効。
+        body["thinking"] = {"type": "adaptive"}
+        body["output_config"] = {"effort": reasoning}
     return httpx.Request(
         "POST",
         f"{p.base_url.rstrip('/')}/v1/messages",
