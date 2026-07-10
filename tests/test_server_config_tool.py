@@ -11,6 +11,11 @@ def test_get_reports_current_settings(isolated_paths: Path) -> None:
     assert "enabled" in out
 
 
+def test_get_reports_provider_default_reasoning(isolated_paths: Path) -> None:
+    out = server.advisor_config("get")
+    assert "provider default" in out
+
+
 def test_get_shows_warnings_on_broken_config(isolated_paths: Path) -> None:
     (isolated_paths / "advisor.toml").write_text("enabled = [broken", encoding="utf-8")
     out = server.advisor_config("get")

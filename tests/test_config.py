@@ -17,6 +17,24 @@ def test_defaults_when_no_file(isolated_paths: Path) -> None:
     assert cfg.warnings == []
 
 
+def test_reasoning_defaults_to_empty(isolated_paths: Path) -> None:
+    cfg = config.load_config()
+    assert cfg.reasoning == ""
+
+
+def test_reasoning_loads_valid_value(isolated_paths: Path) -> None:
+    (isolated_paths / "advisor.toml").write_text('reasoning = "high"\n', encoding="utf-8")
+    cfg = config.load_config()
+    assert cfg.reasoning == "high"
+
+
+def test_reasoning_invalid_value_falls_back(isolated_paths: Path) -> None:
+    (isolated_paths / "advisor.toml").write_text('reasoning = "ultra"\n', encoding="utf-8")
+    cfg = config.load_config()
+    assert cfg.reasoning == ""
+    assert any("reasoning" in w for w in cfg.warnings)
+
+
 def test_load_values_and_provider_override(isolated_paths: Path) -> None:
     (isolated_paths / "advisor.toml").write_text(
         'enabled = false\n'

@@ -25,6 +25,7 @@ enabled = true
 model = "anthropic/claude-opus-4-8"   # "<provider>/<model>"。モデル名は無検証
 max_context_chars = 400000            # advisor に渡す会話の上限(古い方から切り詰め)
 max_consults_per_session = 20         # セッションあたり相談回数上限
+reasoning = "high"        # 任意: low/medium/high。未設定はプロバイダ既定(Claude=思考なし, Gemini=動的思考)
 
 # OpenAI 互換エンドポイントの追加例(OpenRouter / ollama など)
 [providers.openrouter]

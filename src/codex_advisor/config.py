@@ -60,6 +60,7 @@ class AdvisorConfig:
     max_context_chars: int = DEFAULT_MAX_CONTEXT_CHARS
     max_consults_per_session: int = DEFAULT_MAX_CONSULTS
     providers: dict[str, ProviderConfig] = field(default_factory=dict)
+    reasoning: str = ""
     warnings: list[str] = field(default_factory=list)
 
 
@@ -87,6 +88,14 @@ def _merged_providers(overrides: object) -> dict[str, ProviderConfig]:
     return providers
 
 
+def _coerce_reasoning(raw: dict, warnings: list[str]) -> str:
+    value = str(raw.get("reasoning", ""))
+    if value not in ("", "low", "medium", "high"):
+        warnings.append(f"reasoning must be one of low/medium/high; ignoring {value!r}")
+        return ""
+    return value
+
+
 def load_config() -> AdvisorConfig:
     path = config_path()
     raw: dict = {}
@@ -107,6 +116,7 @@ def load_config() -> AdvisorConfig:
             raw, "max_consults_per_session", DEFAULT_MAX_CONSULTS, warnings
         ),
         providers=_merged_providers(raw.get("providers", {})),
+        reasoning=_coerce_reasoning(raw, warnings),
         warnings=warnings,
     )
 

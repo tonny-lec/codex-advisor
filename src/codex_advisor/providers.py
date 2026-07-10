@@ -10,6 +10,7 @@ from codex_advisor.config import ProviderConfig
 
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 RETRY_WAIT_SECONDS = 1.0
+REASONING_BUDGET_TOKENS = {"low": 2048, "medium": 8192, "high": 16384}
 
 
 class AdvisorError(Exception):
@@ -20,18 +21,23 @@ def _redact(text: str, secret: str) -> str:
     return text.replace(secret, "***") if secret else text
 
 
-def _openai_request(p: ProviderConfig, model: str, key: str, system: str, user: str) -> httpx.Request:
+def _openai_request(
+    p: ProviderConfig, model: str, key: str, system: str, user: str, reasoning: str
+) -> httpx.Request:
+    body: dict[str, Any] = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+    }
+    if reasoning:
+        body["reasoning_effort"] = reasoning
     return httpx.Request(
         "POST",
         f"{p.base_url.rstrip('/')}/chat/completions",
         headers={"Authorization": f"Bearer {key}"},
-        json={
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-        },
+        json=body,
     )
 
 
@@ -39,17 +45,24 @@ def _openai_parse(data: Any) -> str:
     return data["choices"][0]["message"]["content"]
 
 
-def _anthropic_request(p: ProviderConfig, model: str, key: str, system: str, user: str) -> httpx.Request:
+def _anthropic_request(
+    p: ProviderConfig, model: str, key: str, system: str, user: str, reasoning: str
+) -> httpx.Request:
+    body: dict[str, Any] = {
+        "model": model,
+        "max_tokens": 8192,
+        "system": system,
+        "messages": [{"role": "user", "content": user}],
+    }
+    if reasoning:
+        budget = REASONING_BUDGET_TOKENS[reasoning]
+        body["thinking"] = {"type": "enabled", "budget_tokens": budget}
+        body["max_tokens"] = budget + 8192
     return httpx.Request(
         "POST",
         f"{p.base_url.rstrip('/')}/v1/messages",
         headers={"x-api-key": key, "anthropic-version": "2023-06-01"},
-        json={
-            "model": model,
-            "max_tokens": 8192,
-            "system": system,
-            "messages": [{"role": "user", "content": user}],
-        },
+        json=body,
     )
 
 
@@ -59,15 +72,21 @@ def _anthropic_parse(data: Any) -> str:
     )
 
 
-def _gemini_request(p: ProviderConfig, model: str, key: str, system: str, user: str) -> httpx.Request:
+def _gemini_request(
+    p: ProviderConfig, model: str, key: str, system: str, user: str, reasoning: str
+) -> httpx.Request:
+    body: dict[str, Any] = {
+        "system_instruction": {"parts": [{"text": system}]},
+        "contents": [{"role": "user", "parts": [{"text": user}]}],
+    }
+    if reasoning:
+        budget = REASONING_BUDGET_TOKENS[reasoning]
+        body["generationConfig"] = {"thinkingConfig": {"thinkingBudget": budget}}
     return httpx.Request(
         "POST",
         f"{p.base_url.rstrip('/')}/v1beta/models/{model}:generateContent",
         headers={"x-goog-api-key": key},
-        json={
-            "system_instruction": {"parts": [{"text": system}]},
-            "contents": [{"role": "user", "parts": [{"text": user}]}],
-        },
+        json=body,
     )
 
 
@@ -77,7 +96,7 @@ def _gemini_parse(data: Any) -> str:
     )
 
 
-_BUILDERS: dict[str, Callable[[ProviderConfig, str, str, str, str], httpx.Request]] = {
+_BUILDERS: dict[str, Callable[[ProviderConfig, str, str, str, str, str], httpx.Request]] = {
     "openai": _openai_request,
     "anthropic": _anthropic_request,
     "gemini": _gemini_request,
@@ -96,6 +115,7 @@ def call_advisor(
     user_content: str,
     *,
     timeout: float = 120.0,
+    reasoning: str = "",
 ) -> str:
     api_key = os.environ.get(provider.api_key_env, "")
     if not api_key:
@@ -108,7 +128,9 @@ def call_advisor(
             f"unknown provider kind {provider.kind!r} (expected openai/anthropic/gemini)"
         )
     try:
-        request = _BUILDERS[provider.kind](provider, model, api_key, system_prompt, user_content)
+        request = _BUILDERS[provider.kind](
+            provider, model, api_key, system_prompt, user_content, reasoning
+        )
     except Exception as e:
         raise AdvisorError(f"invalid provider request: {_redact(str(e), api_key)}") from e
     last_error = ""

@@ -70,6 +70,84 @@ def test_gemini_adapter() -> None:
     assert call_advisor(GEMINI, "gemini-2.5-pro", "sys", "user") == "advice!"
 
 
+@respx.mock
+def test_openai_reasoning_sets_effort() -> None:
+    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=httpx.Response(
+            200, json={"choices": [{"message": {"content": "advice!"}}]}
+        )
+    )
+    call_advisor(OPENAI, "gpt-5.2", "sys", "user", reasoning="high")
+    body = json.loads(route.calls.last.request.content)
+    assert body["reasoning_effort"] == "high"
+
+
+@respx.mock
+def test_openai_without_reasoning_omits_effort() -> None:
+    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=httpx.Response(
+            200, json={"choices": [{"message": {"content": "advice!"}}]}
+        )
+    )
+    call_advisor(OPENAI, "gpt-5.2", "sys", "user")
+    body = json.loads(route.calls.last.request.content)
+    assert "reasoning_effort" not in body
+
+
+@respx.mock
+def test_anthropic_reasoning_sets_thinking_and_max_tokens() -> None:
+    route = respx.post("https://api.anthropic.com/v1/messages").mock(
+        return_value=httpx.Response(
+            200, json={"content": [{"type": "text", "text": "advice!"}]}
+        )
+    )
+    call_advisor(ANTHROPIC, "claude-opus-4-8", "sys", "user", reasoning="high")
+    body = json.loads(route.calls.last.request.content)
+    assert body["thinking"] == {"type": "enabled", "budget_tokens": 16384}
+    assert body["max_tokens"] == 24576
+
+
+@respx.mock
+def test_anthropic_without_reasoning_omits_thinking() -> None:
+    route = respx.post("https://api.anthropic.com/v1/messages").mock(
+        return_value=httpx.Response(
+            200, json={"content": [{"type": "text", "text": "advice!"}]}
+        )
+    )
+    call_advisor(ANTHROPIC, "claude-opus-4-8", "sys", "user")
+    body = json.loads(route.calls.last.request.content)
+    assert "thinking" not in body
+    assert body["max_tokens"] == 8192
+
+
+@respx.mock
+def test_gemini_reasoning_sets_thinking_budget() -> None:
+    route = respx.post(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
+    ).mock(
+        return_value=httpx.Response(
+            200, json={"candidates": [{"content": {"parts": [{"text": "advice!"}]}}]}
+        )
+    )
+    call_advisor(GEMINI, "gemini-2.5-pro", "sys", "user", reasoning="high")
+    body = json.loads(route.calls.last.request.content)
+    assert body["generationConfig"]["thinkingConfig"]["thinkingBudget"] == 16384
+
+
+@respx.mock
+def test_gemini_without_reasoning_omits_generation_config() -> None:
+    route = respx.post(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
+    ).mock(
+        return_value=httpx.Response(
+            200, json={"candidates": [{"content": {"parts": [{"text": "advice!"}]}}]}
+        )
+    )
+    call_advisor(GEMINI, "gemini-2.5-pro", "sys", "user")
+    body = json.loads(route.calls.last.request.content)
+    assert "generationConfig" not in body
+
+
 def test_missing_key_names_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("TEST_OPENAI_KEY")
     with pytest.raises(AdvisorError) as exc:

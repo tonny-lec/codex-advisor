@@ -18,6 +18,7 @@ def fake_advisor(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
     def fake(provider: Any, model: str, system_prompt: str, user_content: str, **kw: Any) -> str:
         calls.update(provider=provider, model=model, system=system_prompt, user=user_content)
+        calls["reasoning"] = kw.get("reasoning", "")
         return "do X first"
 
     monkeypatch.setattr(server.providers, "call_advisor", fake)
@@ -46,6 +47,15 @@ def test_consult_success_attaches_transcript(
     assert "src/x.py" in fake_advisor["user"]
     assert fake_advisor["model"] == "claude-opus-4-8"
     assert "advisor" in fake_advisor["system"].lower()  # advisor_prompt.md が使われる
+
+
+def test_consult_passes_reasoning_setting(
+    isolated_paths: Path, fake_advisor: dict[str, Any]
+) -> None:
+    (isolated_paths / "advisor.toml").write_text('reasoning = "high"\n', encoding="utf-8")
+    _write_rollout(isolated_paths)
+    server.consult_advisor("plan ok?")
+    assert fake_advisor["reasoning"] == "high"
 
 
 def test_consult_disabled(isolated_paths: Path, fake_advisor: dict[str, Any]) -> None:

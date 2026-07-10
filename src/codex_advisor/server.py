@@ -86,6 +86,7 @@ def consult_advisor(question: str, context_hint: str = "") -> str:
             model_name,
             system_prompt,
             _build_user_content(transcript, question, context_hint),
+            reasoning=cfg.reasoning,
         )
     except providers.AdvisorError as e:
         return prefix + f"advisor unavailable: {e}. Proceed with your own judgment."
@@ -111,6 +112,7 @@ def advisor_config(action: str, model: str = "") -> str:
             f"advisor is {state}; model = {cfg.model}; "
             f"max_context_chars = {cfg.max_context_chars}; "
             f"max_consults_per_session = {cfg.max_consults_per_session}"
+            f"; reasoning = {cfg.reasoning or 'provider default'}"
         )
     if action == "set":
         if not model:
