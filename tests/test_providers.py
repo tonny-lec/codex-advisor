@@ -95,16 +95,20 @@ def test_openai_without_reasoning_omits_effort() -> None:
 
 
 @respx.mock
-def test_anthropic_reasoning_sets_thinking_and_max_tokens() -> None:
+def test_anthropic_reasoning_sets_adaptive_thinking_and_effort() -> None:
+    # claude-fable-5 / Opus 4.7+ は enabled+budget_tokens を 400 で拒否する。
+    # adaptive + output_config.effort が現行モデル全系統で有効な形式。
     route = respx.post("https://api.anthropic.com/v1/messages").mock(
         return_value=httpx.Response(
             200, json={"content": [{"type": "text", "text": "advice!"}]}
         )
     )
-    call_advisor(ANTHROPIC, "claude-opus-4-8", "sys", "user", reasoning="high")
+    call_advisor(ANTHROPIC, "claude-fable-5", "sys", "user", reasoning="high")
     body = json.loads(route.calls.last.request.content)
-    assert body["thinking"] == {"type": "enabled", "budget_tokens": 16384}
-    assert body["max_tokens"] == 24576
+    assert body["thinking"] == {"type": "adaptive"}
+    assert body["output_config"] == {"effort": "high"}
+    assert "budget_tokens" not in json.dumps(body)
+    assert body["max_tokens"] == 8192
 
 
 @respx.mock
@@ -117,6 +121,7 @@ def test_anthropic_without_reasoning_omits_thinking() -> None:
     call_advisor(ANTHROPIC, "claude-opus-4-8", "sys", "user")
     body = json.loads(route.calls.last.request.content)
     assert "thinking" not in body
+    assert "output_config" not in body
     assert body["max_tokens"] == 8192
 
 
