@@ -28,6 +28,7 @@ BUILTIN_PROVIDERS: dict[str, dict[str, str]] = {
 DEFAULT_MODEL = "anthropic/claude-opus-4-8"
 DEFAULT_MAX_CONTEXT_CHARS = 400_000
 DEFAULT_MAX_CONSULTS = 20
+DEFAULT_REASONING = "medium"
 
 
 def codex_home() -> Path:
@@ -60,7 +61,7 @@ class AdvisorConfig:
     max_context_chars: int = DEFAULT_MAX_CONTEXT_CHARS
     max_consults_per_session: int = DEFAULT_MAX_CONSULTS
     providers: dict[str, ProviderConfig] = field(default_factory=dict)
-    reasoning: str = ""
+    reasoning: str = DEFAULT_REASONING
     warnings: list[str] = field(default_factory=list)
 
 
@@ -89,10 +90,14 @@ def _merged_providers(overrides: object) -> dict[str, ProviderConfig]:
 
 
 def _coerce_reasoning(raw: dict, warnings: list[str]) -> str:
+    # If key is absent, use DEFAULT_REASONING
+    if "reasoning" not in raw:
+        return DEFAULT_REASONING
+    # If present, validate the value (allow explicit empty string)
     value = str(raw.get("reasoning", ""))
     if value not in ("", "low", "medium", "high"):
         warnings.append(f"reasoning must be one of low/medium/high; ignoring {value!r}")
-        return ""
+        return DEFAULT_REASONING
     return value
 
 

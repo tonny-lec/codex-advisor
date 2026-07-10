@@ -11,6 +11,7 @@ if [[ ! -f "$CODEX_HOME/advisor.toml" ]]; then
   cat > "$CODEX_HOME/advisor.toml" <<'EOF'
 enabled = true
 model = "anthropic/claude-opus-4-8"
+reasoning = "medium"
 max_context_chars = 400000
 max_consults_per_session = 20
 EOF
