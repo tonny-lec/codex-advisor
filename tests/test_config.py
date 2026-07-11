@@ -32,6 +32,13 @@ def test_reasoning_loads_valid_value(isolated_paths: Path) -> None:
     assert cfg.reasoning == "high"
 
 
+def test_reasoning_loads_xhigh(isolated_paths: Path) -> None:
+    (isolated_paths / "advisor.toml").write_text('reasoning = "xhigh"\n', encoding="utf-8")
+    cfg = config.load_config()
+    assert cfg.reasoning == "xhigh"
+    assert cfg.warnings == []
+
+
 def test_reasoning_invalid_value_falls_back(isolated_paths: Path) -> None:
     (isolated_paths / "advisor.toml").write_text('reasoning = "ultra"\n', encoding="utf-8")
     cfg = config.load_config()

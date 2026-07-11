@@ -59,6 +59,22 @@ def test_codex_dispatches_before_api_key_lookup(monkeypatch: pytest.MonkeyPatch)
     }
 
 
+def test_codex_passes_xhigh_through(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_codex(*args: object, **kwargs: object) -> str:
+        captured.update(kwargs)
+        return "subscription advice"
+
+    monkeypatch.setattr(providers.codex_cli, "call_codex_advisor", fake_codex)
+
+    assert (
+        call_advisor(CODEX, "gpt-5.6-sol", "sys", "user", reasoning="xhigh")
+        == "subscription advice"
+    )
+    assert captured["reasoning"] == "xhigh"
+
+
 def test_codex_error_does_not_fall_back(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = 0
 
@@ -130,6 +146,18 @@ def test_openai_reasoning_sets_effort() -> None:
 
 
 @respx.mock
+def test_openai_xhigh_sets_effort() -> None:
+    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=httpx.Response(
+            200, json={"choices": [{"message": {"content": "advice!"}}]}
+        )
+    )
+    call_advisor(OPENAI, "gpt-5.6", "sys", "user", reasoning="xhigh")
+    body = json.loads(route.calls.last.request.content)
+    assert body["reasoning_effort"] == "xhigh"
+
+
+@respx.mock
 def test_openai_without_reasoning_omits_effort() -> None:
     route = respx.post("https://api.openai.com/v1/chat/completions").mock(
         return_value=httpx.Response(
@@ -198,6 +226,15 @@ def test_gemini_without_reasoning_omits_generation_config() -> None:
     call_advisor(GEMINI, "gemini-2.5-pro", "sys", "user")
     body = json.loads(route.calls.last.request.content)
     assert "generationConfig" not in body
+
+
+@pytest.mark.parametrize("provider", [ANTHROPIC, GEMINI])
+def test_xhigh_is_rejected_for_unsupported_provider(provider: ProviderConfig) -> None:
+    with pytest.raises(
+        AdvisorError,
+        match=r"reasoning 'xhigh' is supported only by codex and openai providers",
+    ):
+        call_advisor(provider, "model", "sys", "user", reasoning="xhigh")
 
 
 def test_missing_key_names_env_var(monkeypatch: pytest.MonkeyPatch) -> None:

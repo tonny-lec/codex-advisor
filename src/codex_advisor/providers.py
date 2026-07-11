@@ -118,6 +118,10 @@ def call_advisor(
     reasoning: str = "",
     credential_env_names: Collection[str] = (),
 ) -> str:
+    if reasoning == "xhigh" and provider.kind not in {"codex", "openai"}:
+        raise AdvisorError(
+            "reasoning 'xhigh' is supported only by codex and openai providers"
+        )
     if provider.kind == "codex":
         return codex_cli.call_codex_advisor(
             model,

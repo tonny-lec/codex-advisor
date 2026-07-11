@@ -100,8 +100,8 @@ def _coerce_reasoning(raw: dict, warnings: list[str]) -> str:
         return DEFAULT_REASONING
     # If present, validate the value (allow explicit empty string)
     value = str(raw.get("reasoning", ""))
-    if value not in ("", "low", "medium", "high"):
-        warnings.append(f"reasoning must be one of low/medium/high; ignoring {value!r}")
+    if value not in ("", "low", "medium", "high", "xhigh"):
+        warnings.append(f"reasoning must be one of low/medium/high/xhigh; ignoring {value!r}")
         return DEFAULT_REASONING
     return value
 

@@ -39,7 +39,7 @@ enabled = true
 model = "codex/gpt-5.6-sol"            # "<provider>/<model>"。モデル名は無検証
 max_context_chars = 400000            # advisor に渡す会話の上限(古い方から切り詰め)
 max_consults_per_session = 20         # セッションあたり相談回数上限
-reasoning = "medium"      # 任意: low/medium/high。デフォルトは medium。reasoning = "" でプロバイダ既定(Claude=思考なし, Gemini=動的思考)に戻せる
+reasoning = "medium"      # 任意: low/medium/high/xhigh。デフォルトは medium。reasoning = "" でプロバイダ既定に戻せる
 
 # OpenAI 互換エンドポイントの追加例(OpenRouter / ollama など)
 [providers.openrouter]
@@ -51,6 +51,10 @@ api_key_env = "OPENROUTER_API_KEY"
 `advisor.toml` は相談ごとに読み直すため、モデル切替にMCP再起動は不要。
 `advisor.env` はMCP起動時にだけ読むため、APIキーの追加・変更後はCodexセッションを
 再起動する。
+
+`xhigh` は `codex/` と `openai/` providerで利用できる。選択モデルが非対応の場合は
+下流のCodex CLIまたはAPIがエラーを返し、値を自動変更しない。Anthropic/Geminiでは
+意味の異なる値へ推測変換せず、相談実行前に明示的な非対応エラーを返す。
 
 ## セキュリティ
 

@@ -59,10 +59,10 @@ def test_consult_success_attaches_transcript(
 def test_consult_passes_reasoning_setting(
     isolated_paths: Path, fake_advisor: dict[str, Any]
 ) -> None:
-    (isolated_paths / "advisor.toml").write_text('reasoning = "high"\n', encoding="utf-8")
+    (isolated_paths / "advisor.toml").write_text('reasoning = "xhigh"\n', encoding="utf-8")
     _write_rollout(isolated_paths)
     server.consult_advisor("plan ok?")
-    assert fake_advisor["reasoning"] == "high"
+    assert fake_advisor["reasoning"] == "xhigh"
 
 
 def test_consult_passes_custom_provider_credentials(
