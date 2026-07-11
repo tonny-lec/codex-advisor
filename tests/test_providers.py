@@ -4,6 +4,7 @@ import httpx
 import pytest
 import respx
 
+from codex_advisor import errors, providers
 from codex_advisor.config import ProviderConfig
 from codex_advisor.providers import AdvisorError, call_advisor
 
@@ -18,6 +19,7 @@ GEMINI = ProviderConfig(
     base_url="https://generativelanguage.googleapis.com",
     api_key_env="TEST_GEMINI_KEY",
 )
+CODEX = ProviderConfig(kind="codex", base_url="", api_key_env="")
 
 
 @pytest.fixture(autouse=True)
@@ -25,6 +27,51 @@ def keys(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TEST_OPENAI_KEY", "sk-openai-secret")
     monkeypatch.setenv("TEST_ANTHROPIC_KEY", "sk-ant-secret")
     monkeypatch.setenv("TEST_GEMINI_KEY", "sk-gem-secret")
+
+
+def test_advisor_error_is_reexported() -> None:
+    assert AdvisorError is errors.AdvisorError
+
+
+def test_codex_dispatches_before_api_key_lookup(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_codex(*args: object, **kwargs: object) -> str:
+        captured.update(args=args, kwargs=kwargs)
+        return "subscription advice"
+
+    monkeypatch.setattr(providers.codex_cli, "call_codex_advisor", fake_codex)
+
+    result = call_advisor(
+        CODEX,
+        "gpt-5.6-sol",
+        "sys",
+        "user",
+        reasoning="high",
+        credential_env_names={"OPENAI_API_KEY", "CUSTOM_KEY"},
+    )
+
+    assert result == "subscription advice"
+    assert captured["args"] == ("gpt-5.6-sol", "sys", "user")
+    assert captured["kwargs"] == {
+        "reasoning": "high",
+        "credential_env_names": {"OPENAI_API_KEY", "CUSTOM_KEY"},
+    }
+
+
+def test_codex_error_does_not_fall_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = 0
+
+    def fail(*args: object, **kwargs: object) -> str:
+        nonlocal calls
+        calls += 1
+        raise AdvisorError("codex failed")
+
+    monkeypatch.setattr(providers.codex_cli, "call_codex_advisor", fail)
+
+    with pytest.raises(AdvisorError, match="codex failed"):
+        call_advisor(CODEX, "gpt-5.6-sol", "sys", "user")
+    assert calls == 1
 
 
 @respx.mock

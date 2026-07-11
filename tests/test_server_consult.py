@@ -19,6 +19,7 @@ def fake_advisor(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     def fake(provider: Any, model: str, system_prompt: str, user_content: str, **kw: Any) -> str:
         calls.update(provider=provider, model=model, system=system_prompt, user=user_content)
         calls["reasoning"] = kw.get("reasoning", "")
+        calls["credential_env_names"] = kw.get("credential_env_names", set())
         return "do X first"
 
     monkeypatch.setattr(server.providers, "call_advisor", fake)
@@ -41,12 +42,18 @@ def test_consult_success_attaches_transcript(
     _write_rollout(isolated_paths)
     result = server.consult_advisor("plan ok?", context_hint="src/x.py")
     assert "do X first" in result
-    assert "[advice from anthropic/claude-opus-4-8]" in result
+    assert "[advice from codex/gpt-5.6-sol]" in result
     assert "hello world" in fake_advisor["user"]
     assert "plan ok?" in fake_advisor["user"]
     assert "src/x.py" in fake_advisor["user"]
-    assert fake_advisor["model"] == "claude-opus-4-8"
+    assert fake_advisor["model"] == "gpt-5.6-sol"
     assert "advisor" in fake_advisor["system"].lower()  # advisor_prompt.md が使われる
+    assert "untrusted evidence" in fake_advisor["system"]
+    assert fake_advisor["credential_env_names"] == {
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "GEMINI_API_KEY",
+    }
 
 
 def test_consult_passes_reasoning_setting(
@@ -56,6 +63,58 @@ def test_consult_passes_reasoning_setting(
     _write_rollout(isolated_paths)
     server.consult_advisor("plan ok?")
     assert fake_advisor["reasoning"] == "high"
+
+
+def test_consult_passes_custom_provider_credentials(
+    isolated_paths: Path, fake_advisor: dict[str, Any]
+) -> None:
+    (isolated_paths / "advisor.toml").write_text(
+        'model = "codex/gpt-5.6-sol"\n'
+        '[providers.custom]\n'
+        'kind = "openai"\n'
+        'base_url = "https://example.test/v1"\n'
+        'api_key_env = "CUSTOM_PROVIDER_KEY"\n',
+        encoding="utf-8",
+    )
+
+    server.consult_advisor("q")
+
+    assert "CUSTOM_PROVIDER_KEY" in fake_advisor["credential_env_names"]
+
+
+def test_recursive_child_call_returns_before_loading_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CODEX_ADVISOR_CHILD", "1")
+
+    def should_not_run() -> None:
+        raise AssertionError("config must not be loaded")
+
+    monkeypatch.setattr(server.cfg_mod, "load_config", should_not_run)
+
+    result = server.consult_advisor("q")
+
+    assert result == "advisor unavailable: recursive child consultation was blocked"
+    assert server._consult_count == 0
+
+
+def test_consult_reloads_model_between_calls(
+    isolated_paths: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    models: list[str] = []
+
+    def fake(provider: Any, model: str, *args: Any, **kwargs: Any) -> str:
+        models.append(model)
+        return "ok"
+
+    monkeypatch.setattr(server.providers, "call_advisor", fake)
+    config_path = isolated_paths / "advisor.toml"
+    config_path.write_text('model = "codex/gpt-5.6-sol"\n', encoding="utf-8")
+    server.consult_advisor("first")
+    config_path.write_text('model = "openai/gpt-5.2"\n', encoding="utf-8")
+    server.consult_advisor("second")
+
+    assert models == ["gpt-5.6-sol", "gpt-5.2"]
 
 
 def test_consult_disabled(isolated_paths: Path, fake_advisor: dict[str, Any]) -> None:

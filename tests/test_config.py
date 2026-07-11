@@ -9,10 +9,13 @@ from codex_advisor import config
 def test_defaults_when_no_file(isolated_paths: Path) -> None:
     cfg = config.load_config()
     assert cfg.enabled is True
-    assert cfg.model == "anthropic/claude-opus-4-8"
+    assert cfg.model == "codex/gpt-5.6-sol"
     assert cfg.max_context_chars == 400_000
     assert cfg.max_consults_per_session == 20
-    assert set(cfg.providers) == {"openai", "anthropic", "gemini"}
+    assert set(cfg.providers) == {"codex", "openai", "anthropic", "gemini"}
+    assert cfg.providers["codex"] == config.ProviderConfig(
+        kind="codex", base_url="", api_key_env=""
+    )
     assert cfg.providers["anthropic"].api_key_env == "ANTHROPIC_API_KEY"
     assert cfg.reasoning == "medium"
     assert cfg.warnings == []
@@ -66,7 +69,7 @@ def test_broken_toml_falls_back_to_defaults(isolated_paths: Path) -> None:
     (isolated_paths / "advisor.toml").write_text("enabled = [broken", encoding="utf-8")
     cfg = config.load_config()
     assert cfg.enabled is True
-    assert cfg.model == "anthropic/claude-opus-4-8"
+    assert cfg.model == "codex/gpt-5.6-sol"
     assert cfg.warnings
 
 
@@ -74,7 +77,7 @@ def test_non_utf8_file_falls_back_to_defaults(isolated_paths: Path) -> None:
     (isolated_paths / "advisor.toml").write_bytes(b"\xff\xfe\x00broken")
     cfg = config.load_config()
     assert cfg.enabled is True
-    assert cfg.model == "anthropic/claude-opus-4-8"
+    assert cfg.model == "codex/gpt-5.6-sol"
     assert cfg.warnings
 
 
@@ -87,6 +90,7 @@ def test_non_integer_value_falls_back(isolated_paths: Path) -> None:
 
 def test_split_model() -> None:
     assert config.split_model("openai/gpt-5.2") == ("openai", "gpt-5.2")
+    assert config.split_model("codex/gpt-5.6-sol") == ("codex", "gpt-5.6-sol")
     # モデル名側の追加スラッシュは許容(モデル名は検証しない)
     assert config.split_model("openrouter/meta-llama/llama-4") == ("openrouter", "meta-llama/llama-4")
 

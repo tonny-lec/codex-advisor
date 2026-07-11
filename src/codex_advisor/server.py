@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.resources
+import os
 
 from mcp.server.fastmcp import FastMCP
 
@@ -40,6 +41,8 @@ def consult_advisor(question: str, context_hint: str = "") -> str:
     automatically; put the specific decision to evaluate in `question`.
     """
     global _consult_count
+    if os.environ.get("CODEX_ADVISOR_CHILD") == "1":
+        return "advisor unavailable: recursive child consultation was blocked"
     cfg = cfg_mod.load_config()
     prefix = "".join(f"[advisor warning] {w}\n" for w in cfg.warnings)
     if not cfg.enabled:
@@ -87,6 +90,9 @@ def consult_advisor(question: str, context_hint: str = "") -> str:
             system_prompt,
             _build_user_content(transcript, question, context_hint),
             reasoning=cfg.reasoning,
+            credential_env_names={
+                p.api_key_env for p in cfg.providers.values() if p.api_key_env
+            },
         )
     except providers.AdvisorError as e:
         return prefix + f"advisor unavailable: {e}. Proceed with your own judgment."
@@ -100,8 +106,8 @@ def advisor_config(action: str, model: str = "") -> str:
     """Get or change advisor settings. Use when the user asks.
 
     action='get' shows current settings. action='set' changes the advisor
-    model; pass model as '<provider>/<model>', e.g. 'openai/gpt-5.2',
-    'anthropic/claude-opus-4-8', 'gemini/gemini-2.5-pro'. Any model name is
+    model; pass model as '<provider>/<model>', e.g. 'codex/gpt-5.6-sol',
+    'openai/gpt-5.2', 'anthropic/claude-opus-4-8', 'gemini/gemini-2.5-pro'. Any model name is
     accepted (no allowlist). action='off' disables consultations.
     """
     cfg = cfg_mod.load_config()

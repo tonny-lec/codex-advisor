@@ -10,7 +10,7 @@ mkdir -p "$CODEX_HOME"
 if [[ ! -f "$CODEX_HOME/advisor.toml" ]]; then
   cat > "$CODEX_HOME/advisor.toml" <<'EOF'
 enabled = true
-model = "anthropic/claude-opus-4-8"
+model = "codex/gpt-5.6-sol"
 reasoning = "medium"
 max_context_chars = 400000
 max_consults_per_session = 20
@@ -37,10 +37,19 @@ fi
 
 # 承認プロンプトなしで advisor ツールを呼べるようにする(これが無いと
 # codex exec や自動相談でツール呼び出しがキャンセルされる)
-if ! grep -q 'default_tools_approval_mode' "$CODEX_HOME/config.toml" 2>/dev/null; then
+advisor_has_approval_mode() {
+  awk '
+    /^\[mcp_servers\.advisor\]$/ { in_advisor = 1; next }
+    /^\[/ { in_advisor = 0 }
+    in_advisor && /^[[:space:]]*default_tools_approval_mode[[:space:]]*=/ { found = 1 }
+    END { exit(found ? 0 : 1) }
+  ' "$CODEX_HOME/config.toml" 2>/dev/null
+}
+
+if ! advisor_has_approval_mode; then
   sed -i '/^\[mcp_servers\.advisor\]$/a default_tools_approval_mode = "approve"' \
     "$CODEX_HOME/config.toml"
-  if grep -q 'default_tools_approval_mode' "$CODEX_HOME/config.toml" 2>/dev/null; then
+  if advisor_has_approval_mode; then
     echo "set default_tools_approval_mode=approve for 'advisor'"
   fi
 fi

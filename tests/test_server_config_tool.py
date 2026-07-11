@@ -7,7 +7,7 @@ from codex_advisor import config, server
 
 def test_get_reports_current_settings(isolated_paths: Path) -> None:
     out = server.advisor_config("get")
-    assert "anthropic/claude-opus-4-8" in out
+    assert "codex/gpt-5.6-sol" in out
     assert "enabled" in out
 
 
@@ -35,6 +35,15 @@ def test_set_accepts_arbitrary_model_names(isolated_paths: Path) -> None:
     out = server.advisor_config("set", model="openrouter/meta-llama/llama-4-behemoth")
     assert "error" not in out
     assert config.load_config().model == "openrouter/meta-llama/llama-4-behemoth"
+
+
+def test_set_switches_between_subscription_and_api_models(isolated_paths: Path) -> None:
+    server.advisor_config("set", model="codex/gpt-5.6-sol")
+    assert config.load_config().model == "codex/gpt-5.6-sol"
+    server.advisor_config("set", model="openai/gpt-5.2")
+    assert config.load_config().model == "openai/gpt-5.2"
+    server.advisor_config("set", model="codex/gpt-5.6-sol")
+    assert config.load_config().model == "codex/gpt-5.6-sol"
 
 
 def test_set_rejects_model_without_slash(isolated_paths: Path) -> None:

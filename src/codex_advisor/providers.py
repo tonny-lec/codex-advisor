@@ -2,19 +2,18 @@ from __future__ import annotations
 
 import os
 import time
+from collections.abc import Collection
 from typing import Any, Callable
 
 import httpx
 
+from codex_advisor import codex_cli
 from codex_advisor.config import ProviderConfig
+from codex_advisor.errors import AdvisorError
 
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 RETRY_WAIT_SECONDS = 1.0
 REASONING_BUDGET_TOKENS = {"low": 2048, "medium": 8192, "high": 16384}
-
-
-class AdvisorError(Exception):
-    """ツール結果に表示してよいメッセージを持つ(API キー値を含めないこと)。"""
 
 
 def _redact(text: str, secret: str) -> str:
@@ -117,7 +116,16 @@ def call_advisor(
     *,
     timeout: float = 120.0,
     reasoning: str = "",
+    credential_env_names: Collection[str] = (),
 ) -> str:
+    if provider.kind == "codex":
+        return codex_cli.call_codex_advisor(
+            model,
+            system_prompt,
+            user_content,
+            reasoning=reasoning,
+            credential_env_names=credential_env_names,
+        )
     api_key = os.environ.get(provider.api_key_env, "")
     if not api_key:
         raise AdvisorError(

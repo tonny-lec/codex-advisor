@@ -8,6 +8,11 @@ from pathlib import Path
 import tomli_w
 
 BUILTIN_PROVIDERS: dict[str, dict[str, str]] = {
+    "codex": {
+        "kind": "codex",
+        "base_url": "",
+        "api_key_env": "",
+    },
     "openai": {
         "kind": "openai",
         "base_url": "https://api.openai.com/v1",
@@ -25,7 +30,7 @@ BUILTIN_PROVIDERS: dict[str, dict[str, str]] = {
     },
 }
 
-DEFAULT_MODEL = "anthropic/claude-opus-4-8"
+DEFAULT_MODEL = "codex/gpt-5.6-sol"
 DEFAULT_MAX_CONTEXT_CHARS = 400_000
 DEFAULT_MAX_CONSULTS = 20
 DEFAULT_REASONING = "medium"
