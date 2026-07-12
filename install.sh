@@ -7,6 +7,11 @@ MARKER_START="<!-- codex-advisor:start -->"
 
 mkdir -p "$CODEX_HOME"
 
+if [[ -L "$CODEX_HOME/advisor.env" ]]; then
+  echo "refusing to use symlink: $CODEX_HOME/advisor.env" >&2
+  exit 1
+fi
+
 if [[ ! -f "$CODEX_HOME/advisor.toml" ]]; then
   cat > "$CODEX_HOME/advisor.toml" <<'EOF'
 enabled = true
@@ -29,6 +34,8 @@ EOF
   chmod 600 "$CODEX_HOME/advisor.env"
   echo "created $CODEX_HOME/advisor.env (add your API keys here)"
 fi
+
+chmod 600 "$CODEX_HOME/advisor.env"
 
 if ! codex mcp get advisor >/dev/null 2>&1; then
   codex mcp add advisor -- uv --directory "$REPO_DIR" run codex-advisor

@@ -3,3 +3,31 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
+
+# Local credentials and Codex session data
+.env
+.env.*
+*.env
+!.env.example
+advisor.env
+.codex/
+
+# Private keys and local certificates
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Build and coverage output
+build/
+dist/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.pyright/
+
+# Local planning/tooling artifacts
+.superpowers/
+CLAUDE.md
+docs/superpowers/

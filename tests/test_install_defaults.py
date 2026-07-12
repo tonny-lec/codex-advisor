@@ -73,6 +73,20 @@ def test_installer_preserves_existing_advisor_config(tmp_path: Path) -> None:
     assert (codex_home / "advisor.toml").read_text(encoding="utf-8") == existing
 
 
+def test_installer_repairs_existing_advisor_env_permissions(tmp_path: Path) -> None:
+    codex_home, env = _isolated_installer_env(tmp_path)
+    advisor_env = codex_home / "advisor.env"
+    advisor_env.write_text("OPENAI_API_KEY=placeholder\n", encoding="utf-8")
+    advisor_env.chmod(0o644)
+
+    result = subprocess.run(
+        ["bash", "install.sh"], cwd=REPO_ROOT, env=env, text=True, capture_output=True
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert advisor_env.stat().st_mode & 0o777 == 0o600
+
+
 def test_installer_checks_approval_mode_only_in_advisor_section(tmp_path: Path) -> None:
     codex_home, env = _isolated_installer_env(tmp_path)
     (codex_home / "config.toml").write_text(
