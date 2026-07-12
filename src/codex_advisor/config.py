@@ -12,6 +12,7 @@ BUILTIN_PROVIDERS: dict[str, dict[str, str]] = {
         "kind": "codex",
         "base_url": "",
         "api_key_env": "",
+        "auth_method": "chatgpt",
     },
     "openai": {
         "kind": "openai",
@@ -57,6 +58,9 @@ class ProviderConfig:
     kind: str
     base_url: str
     api_key_env: str
+    # Only the Codex CLI provider uses this. An empty value means its
+    # backwards-compatible default, ChatGPT authentication.
+    auth_method: str = ""
 
 
 @dataclass
@@ -78,7 +82,7 @@ def _coerce_int(raw: dict, key: str, default: int, warnings: list[str]) -> int:
     return value
 
 
-def _merged_providers(overrides: object) -> dict[str, ProviderConfig]:
+def _merged_providers(overrides: object, warnings: list[str]) -> dict[str, ProviderConfig]:
     providers = {name: ProviderConfig(**spec) for name, spec in BUILTIN_PROVIDERS.items()}
     if not isinstance(overrides, dict):
         return providers
@@ -90,7 +94,16 @@ def _merged_providers(overrides: object) -> dict[str, ProviderConfig]:
             kind=str(spec.get("kind", base.kind if base else "openai")),
             base_url=str(spec.get("base_url", base.base_url if base else "")),
             api_key_env=str(spec.get("api_key_env", base.api_key_env if base else "")),
+            auth_method=str(spec.get("auth_method", base.auth_method if base else "")),
         )
+        if (
+            providers[name].kind == "codex"
+            and providers[name].auth_method not in ("", "chatgpt", "api")
+        ):
+            warnings.append(
+                f"providers.{name}.auth_method must be chatgpt or api; "
+                "consultation will fail closed"
+            )
     return providers
 
 
@@ -125,7 +138,7 @@ def load_config() -> AdvisorConfig:
         max_consults_per_session=_coerce_int(
             raw, "max_consults_per_session", DEFAULT_MAX_CONSULTS, warnings
         ),
-        providers=_merged_providers(raw.get("providers", {})),
+        providers=_merged_providers(raw.get("providers", {}), warnings),
         reasoning=_coerce_reasoning(raw, warnings),
         warnings=warnings,
     )

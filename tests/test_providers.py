@@ -56,6 +56,8 @@ def test_codex_dispatches_before_api_key_lookup(monkeypatch: pytest.MonkeyPatch)
     assert captured["kwargs"] == {
         "reasoning": "high",
         "credential_env_names": {"OPENAI_API_KEY", "CUSTOM_KEY"},
+        "auth_method": "chatgpt",
+        "api_key_env": "",
     }
 
 
@@ -73,6 +75,23 @@ def test_codex_passes_xhigh_through(monkeypatch: pytest.MonkeyPatch) -> None:
         == "subscription advice"
     )
     assert captured["reasoning"] == "xhigh"
+
+
+def test_codex_passes_api_authentication_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_codex(*args: object, **kwargs: object) -> str:
+        captured.update(kwargs)
+        return "api advice"
+
+    monkeypatch.setattr(providers.codex_cli, "call_codex_advisor", fake_codex)
+    api_codex = ProviderConfig(
+        kind="codex", base_url="", api_key_env="CUSTOM_CODEX_KEY", auth_method="api"
+    )
+
+    assert call_advisor(api_codex, "gpt-5.6-sol", "sys", "user") == "api advice"
+    assert captured["auth_method"] == "api"
+    assert captured["api_key_env"] == "CUSTOM_CODEX_KEY"
 
 
 def test_codex_error_does_not_fall_back(monkeypatch: pytest.MonkeyPatch) -> None:

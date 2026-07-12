@@ -78,6 +78,99 @@ def test_empty_reasoning_omits_override(monkeypatch: pytest.MonkeyPatch) -> None
     assert not any("model_reasoning_effort" in arg for arg in captured["command"])
 
 
+def test_api_auth_forwards_only_selected_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, Any] = {}
+    monkeypatch.setenv("OPENAI_API_KEY", "ambient-openai-secret")
+    monkeypatch.setenv("CUSTOM_CODEX_KEY", "codex-api-secret")
+    monkeypatch.setenv("CODEX_API_KEY", "other-codex-secret")
+    monkeypatch.setattr(codex_cli.subprocess, "run", _successful_run(captured))
+
+    codex_cli.call_codex_advisor(
+        "gpt-5.6-sol",
+        "sys",
+        "user",
+        auth_method="api",
+        api_key_env="CUSTOM_CODEX_KEY",
+        credential_env_names={"CUSTOM_CODEX_KEY"},
+    )
+
+    command = captured["command"]
+    assert 'forced_login_method="api"' in command
+    child_env = captured["env"]
+    assert child_env["CODEX_API_KEY"] == "codex-api-secret"
+    assert "CUSTOM_CODEX_KEY" not in child_env
+    assert "OPENAI_API_KEY" not in child_env
+    assert "ambient-openai-secret" not in child_env.values()
+
+
+def test_api_auth_can_use_codex_cli_stored_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "ambient-openai-secret")
+    monkeypatch.delenv("CODEX_API_KEY", raising=False)
+    captured: dict[str, Any] = {}
+    monkeypatch.setattr(codex_cli.subprocess, "run", _successful_run(captured))
+
+    codex_cli.call_codex_advisor("gpt-5.6-sol", "sys", "user", auth_method="api")
+
+    assert 'forced_login_method="api"' in captured["command"]
+    assert "OPENAI_API_KEY" not in captured["env"]
+    assert "CODEX_API_KEY" not in captured["env"]
+
+
+def test_api_auth_explicit_key_env_must_be_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("CUSTOM_CODEX_KEY", raising=False)
+    calls = 0
+
+    def should_not_run(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        raise AssertionError("Codex CLI must not start without the explicit API key")
+
+    monkeypatch.setattr(codex_cli.subprocess, "run", should_not_run)
+
+    with pytest.raises(AdvisorError, match="CUSTOM_CODEX_KEY.*Codex API authentication"):
+        codex_cli.call_codex_advisor(
+            "gpt-5.6-sol",
+            "sys",
+            "user",
+            auth_method="api",
+            api_key_env="CUSTOM_CODEX_KEY",
+        )
+    assert calls == 0
+
+
+def test_unknown_api_auth_method_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = 0
+
+    def should_not_run(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        raise AssertionError("Codex CLI must not start with an unknown auth method")
+
+    monkeypatch.setattr(codex_cli.subprocess, "run", should_not_run)
+
+    with pytest.raises(AdvisorError, match="unsupported Codex authentication method"):
+        codex_cli.call_codex_advisor("gpt-5.6-sol", "sys", "user", auth_method="automatic")
+    assert calls == 0
+
+
+def test_api_auth_error_redacts_selected_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            command, 7, stdout="", stderr="invalid key codex-api-secret"
+        )
+
+    monkeypatch.setenv("OPENAI_API_KEY", "codex-api-secret")
+    monkeypatch.setattr(codex_cli.subprocess, "run", fail)
+
+    with pytest.raises(AdvisorError) as exc:
+        codex_cli.call_codex_advisor("gpt-5.6-sol", "sys", "user", auth_method="api")
+    assert "codex-api-secret" not in str(exc.value)
+    assert "***" in str(exc.value)
+    assert "API key" in str(exc.value)
+
+
 def test_child_environment_scrubs_credentials_without_mutating_parent(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

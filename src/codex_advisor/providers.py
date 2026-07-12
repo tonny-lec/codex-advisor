@@ -129,6 +129,8 @@ def call_advisor(
             user_content,
             reasoning=reasoning,
             credential_env_names=credential_env_names,
+            auth_method=provider.auth_method or "chatgpt",
+            api_key_env=provider.api_key_env,
         )
     api_key = os.environ.get(provider.api_key_env, "")
     if not api_key:

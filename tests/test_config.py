@@ -14,7 +14,7 @@ def test_defaults_when_no_file(isolated_paths: Path) -> None:
     assert cfg.max_consults_per_session == 20
     assert set(cfg.providers) == {"codex", "openai", "anthropic", "gemini"}
     assert cfg.providers["codex"] == config.ProviderConfig(
-        kind="codex", base_url="", api_key_env=""
+        kind="codex", base_url="", api_key_env="", auth_method="chatgpt"
     )
     assert cfg.providers["anthropic"].api_key_env == "ANTHROPIC_API_KEY"
     assert cfg.reasoning == "medium"
@@ -70,6 +70,34 @@ def test_load_values_and_provider_override(isolated_paths: Path) -> None:
     assert cfg.max_context_chars == 1000
     assert cfg.providers["openrouter"].base_url == "https://openrouter.ai/api/v1"
     assert cfg.providers["openai"].kind == "openai"  # 組み込みは残る
+
+
+def test_codex_api_authentication_settings_load(isolated_paths: Path) -> None:
+    (isolated_paths / "advisor.toml").write_text(
+        '[providers.codex]\n'
+        'auth_method = "api"\n'
+        'api_key_env = "CUSTOM_CODEX_KEY"\n',
+        encoding="utf-8",
+    )
+
+    cfg = config.load_config()
+
+    assert cfg.providers["codex"].auth_method == "api"
+    assert cfg.providers["codex"].api_key_env == "CUSTOM_CODEX_KEY"
+    assert cfg.warnings == []
+
+
+def test_invalid_codex_authentication_method_fails_closed(
+    isolated_paths: Path,
+) -> None:
+    (isolated_paths / "advisor.toml").write_text(
+        '[providers.codex]\nauth_method = "automatic"\n', encoding="utf-8"
+    )
+
+    cfg = config.load_config()
+
+    assert cfg.providers["codex"].auth_method == "automatic"
+    assert any("providers.codex.auth_method" in warning for warning in cfg.warnings)
 
 
 def test_broken_toml_falls_back_to_defaults(isolated_paths: Path) -> None:
